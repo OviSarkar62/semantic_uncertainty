@@ -25,3 +25,25 @@
 6. Run: python semantic_uncertainty/generate_answers.py --model_name=Llama-2-7b-chat --dataset=trivia_qa
 
 Reproduced result: semantic_entropy AUROC 0.783 (paper reports ~0.79 avg for LLaMA-2-7b-chat/TriviaQA - matches).
+
+## Updates from the K = 10 to 50 cluster study
+
+Dataset fixes in semantic_uncertainty/uncertainty/data/data_utils.py:
+- squad uses rajpurkar/squad_v2 (the bare squad_v2 id breaks newer huggingface_hub)
+- nq uses google-research-datasets/nq_open
+- the --dataset argument is nq, not nq_open
+
+BioASQ needs a manual download:
+- get training11b.json from https://zenodo.org/records/7655130
+- put it in ~/semantic_uncertainty_dev/data/bioasq/
+- export SCRATCH_DIR=/home/lab before running
+
+Model names: Llama-2-7b-chat, Llama-2-13b-chat, Mistral-7B-Instruct-v0.1, falcon-7b-instruct.
+Llama-2-70b-chat and falcon-40b-instruct do not fit in 49 GB in fp16 and were not run.
+
+Study pipeline (50 samples per question, K = 10 to 50 are the first K samples):
+1. ./run_dev_model.sh MODEL_NAME     (generation, saves cluster_stats/MODEL_dataset.json)
+2. python build_count_index.py MODEL_NAME   (count index tables, descending K ... 1)
+3. python build_excel.py MODEL_NAME         (one workbook per model)
+
+Set HUGGING_FACE_HUB_TOKEN and OPENAI_API_KEY in the shell before running. Never put them in files.

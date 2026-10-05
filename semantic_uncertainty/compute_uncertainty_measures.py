@@ -174,6 +174,15 @@ def main(args):
     entropies = defaultdict(list)
     validation_embeddings, validation_is_true, validation_answerable = [], [], []
     p_trues = []
+
+    cluster_stats = []
+    N_LIST = [10, 20, 30, 40, 50]
+
+    def _summ(p):
+        p = np.asarray(p, dtype=float)
+        return {'min': float(p.min()), 'max': float(p.max()),
+                'mean': float(p.mean()), 'std': float(p.std())}
+    
     count = 0  # pylint: disable=invalid-name
 
     def is_answerable(generation):
@@ -250,6 +259,34 @@ def main(args):
             pe = predictive_entropy_rao(log_likelihood_per_semantic_id)
             entropies['semantic_entropy'].append(pe)
 
+            # ---- Cluster-probability stats for growing sample sizes ----
+            record = {'idx': idx, 'id': str(tid),
+                      'is_correct': float(validation_is_true[-1]),
+                      'by_n': {}}
+            for n in N_LIST:
+                if n > len(semantic_ids):
+                    continue
+                ids_n = semantic_ids[:n]
+                ll_n = log_liks_agg[:n]
+                # count-based cluster probabilities
+                _, counts = np.unique(ids_n, return_counts=True)
+                p_count = counts / n
+                # likelihood-based cluster probabilities (what semantic_entropy uses)
+                lp = logsumexp_by_id(ids_n, ll_n, agg='sum_normalized')
+                p_lik = np.exp(np.array(lp, dtype=float))
+                record['by_n'][str(n)] = {
+                    'num_clusters': int(len(counts)),
+                    'cluster_sizes': [int(c) for c in counts],
+                    'count_probs': [float(p) for p in p_count],
+                    'lik_probs': [float(p) for p in p_lik],
+                    'lik_probs_sum': float(p_lik.sum()),
+                    'count': _summ(p_count),
+                    'lik': _summ(p_lik),
+                    'discrete_entropy': float(cluster_assignment_entropy(ids_n)),
+                    'semantic_entropy': float(predictive_entropy_rao(lp)),
+                }
+            cluster_stats.append(record)
+
             # pylint: disable=invalid-name
             log_str = 'semantic_ids: %s, avg_token_log_likelihoods: %s, entropies: %s'
             entropies_fmt = ', '.join([f'{i}:{j[-1]:.2f}' for i, j in entropies.items()])
@@ -297,6 +334,17 @@ def main(args):
 
     if args.compute_predictive_entropy:
         result_dict['uncertainty_measures'].update(entropies)
+
+    
+    
+    if args.compute_predictive_entropy and cluster_stats:
+        import json
+        out_dir = os.environ.get('CLUSTER_STATS_DIR', 'cluster_stats')
+        os.makedirs(out_dir, exist_ok=True)
+        fname = f"{getattr(args, 'model_name', 'model')}_{getattr(args, 'dataset', 'dataset')}.json"
+        with open(os.path.join(out_dir, fname), 'w') as f:
+            json.dump(cluster_stats, f)
+        logging.info('Saved cluster stats to %s', os.path.join(out_dir, fname))
 
     if args.compute_p_ik or args.compute_p_ik_answerable:
         # Assemble training data for embedding classification.

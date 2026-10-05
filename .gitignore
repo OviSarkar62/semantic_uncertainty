@@ -135,3 +135,15 @@ dmypy.json
 
 # VSCODE
 .vscode
+
+# Study outputs and local files
+wandb/
+run_logs/
+*.log
+nohup.out
+/data/
+/oxs494/
+analysis_out/
+cluster_stats/keep_*.json
+download_log.txt
+run_log.txt
