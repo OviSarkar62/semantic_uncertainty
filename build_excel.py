@@ -1,3 +1,4 @@
+import os
 import sys
 import pandas as pd
 import openpyxl
@@ -7,6 +8,12 @@ OUT = 'analysis_out'
 DATASETS = ['trivia_qa', 'squad', 'bioasq', 'nq', 'svamp']
 KS = [10, 20, 30, 40, 50]
 xlsx = f'{OUT}/count_index_all_{MODEL}.xlsx'
+
+def with_sum_row(df):
+    cols = ['is_correct', 'num_clusters'] + [c for c in df.columns if str(c).isdigit()]
+    row = {c: int(df[c].sum()) for c in cols}
+    row['question'] = 'Sum'
+    return pd.concat([df, pd.DataFrame([row])], ignore_index=True)
 
 readme = pd.DataFrame({'item': [
     'Model / sampling', 'Per-question sheets', 'Index columns', 'Example (K=10)',
@@ -32,7 +39,10 @@ with pd.ExcelWriter(xlsx, engine='openpyxl') as w:
     pd.read_csv(f'{OUT}/count_index_summary_by_K_{MODEL}.csv').round(4).to_excel(w, sheet_name='Summary_by_K', index=False)
     for ds in DATASETS:
         for K in KS:
-            pd.read_csv(f'{OUT}/count_index_{MODEL}_{ds}_K{K}.csv').round(4).to_excel(w, sheet_name=f'{ds}_K{K}', index=False)
+            path = f'{OUT}/count_index_{MODEL}_{ds}_K{K}.csv'
+            if not os.path.exists(path):
+                continue
+            with_sum_row(pd.read_csv(path).round(4)).to_excel(w, sheet_name=f'{ds}_K{K}', index=False)
     for ws in w.book.worksheets:
         ws.freeze_panes = 'A2'
     w.book['README'].column_dimensions['A'].width = 26
