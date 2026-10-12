@@ -163,9 +163,10 @@ class HuggingfaceModel(BaseModel):
                 kwargs = {}
 
             model_id = f'mistralai/{model_name}'
+            tok_kwargs = {'fix_mistral_regex': True} if 'nemo' in model_name.lower() else {}
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_id, device_map='auto', token_type_ids=None,
-                clean_up_tokenization_spaces=False)
+                clean_up_tokenization_spaces=False, **tok_kwargs)
 
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_id,
